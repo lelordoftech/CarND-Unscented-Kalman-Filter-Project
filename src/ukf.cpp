@@ -24,10 +24,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.15;
+  std_a_ = 0.28;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = M_PI/8;
+  std_yawdd_ = M_PI/12;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -69,6 +69,16 @@ UKF::UKF() {
 
   // initial vector for weights_
   weights_ = VectorXd(2*n_aug_+1);
+
+  // initial state vector
+  x_ << 0, 0, 0, 0, 0;
+
+  // Update covariance matrix
+  P_ << 0.14, 0,    0, 0,    0,
+        0,    0.35, 0, 0,    0,
+        0,    0,    1, 0,    0,
+        0,    0,    0, 0.02, 0,
+        0,    0,    0, 0,    3;
 }
 
 UKF::~UKF() {}
@@ -92,13 +102,6 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     // first measurement
     cout << "UKF Initialization: " << endl;
 
-    // Update covariance matrix
-    P_ << 0.0043, 0,      0,      0,      0,
-          0,      0.0077, 0,      0,      0,
-          0,      0,      0.0054, 0,      0,
-          0,      0,      0,      0.0098, 0,
-          0,      0,      0,      0,      0.0123;
-
     //set vector for weights_
     double weight_0 = lambda_/(lambda_+n_aug_);
     weights_(0) = weight_0;
@@ -113,10 +116,10 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       */
       float ro = meas_package.raw_measurements_[0];
       float theta = meas_package.raw_measurements_[1];
-      //float ro_dot = meas_package.raw_measurements_[2];
       float px = ro * cos(theta);
       float py = ro * sin(theta);
-      x_ << px, py, 0, 0, 0;
+      x_(0) = px;
+      x_(1) = py;
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
       /**
@@ -124,7 +127,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       */
       float px = meas_package.raw_measurements_[0];
       float py = meas_package.raw_measurements_[1];
-      x_ << px, py, 0, 0, 0;
+      x_(0) = px;
+      x_(1) = py;
     }
 
     time_us_ = meas_package.timestamp_;
@@ -377,8 +381,11 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   P_ = P_ - K*S*K.transpose();
 
   //calculate the lidar NIS
-  VectorXd e = z_diff.transpose() * S.inverse() * z_diff;
-  cout << "Lidar - NIS: " << e << endl;
+  float e = z_diff.transpose() * S.inverse() * z_diff;
+  if (e >= 5.991)
+  {
+    cout << "Lidar - NIS: " << e << endl;
+  }
 }
 
 /**
@@ -499,6 +506,9 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   P_ = P_ - K*S*K.transpose();
 
   //calculate the lidar NIS
-  VectorXd e = z_diff.transpose() * S.inverse() * z_diff;
-  cout << "Radar - NIS: " << e << endl;
+  float e = z_diff.transpose() * S.inverse() * z_diff;
+  if (e >= 7.815)
+  {
+    cout << "Radar - NIS: " << e << endl;
+  }
 }
