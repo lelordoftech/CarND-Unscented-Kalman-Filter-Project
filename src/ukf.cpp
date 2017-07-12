@@ -24,7 +24,7 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.28;
+  std_a_ = 0.292;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
   std_yawdd_ = M_PI/12;
@@ -74,11 +74,11 @@ UKF::UKF() {
   x_ << 0, 0, 0, 0, 0;
 
   // Update covariance matrix
-  P_ << 0.14, 0,    0, 0,    0,
-        0,    0.35, 0, 0,    0,
-        0,    0,    1, 0,    0,
-        0,    0,    0, 0.02, 0,
-        0,    0,    0, 0,    3;
+  P_ << 0.14, 0,    0, 0,     0,
+        0,    0.35, 0, 0,     0,
+        0,    0,    1, 0,     0,
+        0,    0,    0, 0.022, 0,
+        0,    0,    0, 0,     3;
 }
 
 UKF::~UKF() {}
@@ -340,8 +340,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z,n_z);
-  R <<    std_a_*std_a_, 0,
-          0, std_a_*std_a_;
+  R << std_a_*std_a_, 0,
+       0, std_a_*std_a_;
   S = S + R;
 
   /*****************************************************************************
@@ -350,9 +350,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   //create vector for incoming lidar measurement
   VectorXd z = VectorXd(n_z);
-  z <<
-      meas_package.raw_measurements_[0],
-      meas_package.raw_measurements_[1];
+  z << meas_package.raw_measurements_[0],
+       meas_package.raw_measurements_[1];
 
   //create matrix for cross correlation Tc
   MatrixXd Tc = MatrixXd(n_x_, n_z);
@@ -366,6 +365,9 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    //angle normalization
+    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
+    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
@@ -453,9 +455,9 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z,n_z);
-  R <<    std_radr_*std_radr_, 0, 0,
-          0, std_radphi_*std_radphi_, 0,
-          0, 0,std_radrd_*std_radrd_;
+  R << std_radr_*std_radr_, 0, 0,
+       0, std_radphi_*std_radphi_, 0,
+       0, 0,std_radrd_*std_radrd_;
   S = S + R;
 
   /*****************************************************************************
@@ -464,10 +466,9 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   //create vector for incoming radar measurement
   VectorXd z = VectorXd(n_z);
-  z <<
-      meas_package.raw_measurements_[0],
-      meas_package.raw_measurements_[1],
-      meas_package.raw_measurements_[2];
+  z << meas_package.raw_measurements_[0],
+       meas_package.raw_measurements_[1],
+       meas_package.raw_measurements_[2];
 
   //create matrix for cross correlation Tc
   MatrixXd Tc = MatrixXd(n_x_, n_z);
