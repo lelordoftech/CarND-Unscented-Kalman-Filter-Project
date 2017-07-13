@@ -124,7 +124,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
       float px = ro * cos(theta);
       float py = ro * sin(theta);
       x_ << px, py, 0, 0, 0;
-      cout << "RADAR x: " << x_ << endl;
+      cout << "RADAR x: " << x_[0] << " " << x_[1] << endl;
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::LASER)
     {
@@ -134,7 +134,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
       float px = meas_package.raw_measurements_[0];
       float py = meas_package.raw_measurements_[1];
       x_ << px, py, 0, 0, 0;
-      cout << "LASER x: " << x_ << endl;
+      cout << "LASER x: " << x_[0] << " " << x_[1] << endl;
     }
 
     time_us_ = meas_package.timestamp_;
@@ -148,10 +148,18 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
    ****************************************************************************/
 
   //compute the time elapsed between the current and previous measurements
-  float dt = (meas_package.timestamp_ - time_us_) / 1000000.0; //dt - expressed in seconds
+  float delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0; //dt - expressed in seconds
   time_us_ = meas_package.timestamp_;
 
-  Prediction(dt);
+  // This fix does not work with dataset obj_pose-laser-radar-synthetic-input.txt
+  // because in dataset have delta_t is always 0.05
+  while (delta_t > 0.1)
+  {
+    const double dt = 0.05;
+    Prediction(dt);
+    delta_t -= dt;
+  }
+  Prediction(delta_t);
 
   /*****************************************************************************
    *  Update
@@ -293,8 +301,15 @@ void UKF::Prediction(double delta_t)
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
-    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
-    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+    x_diff(3) = fmod(x_diff(3), (2.* M_PI));
+    if (x_diff(3) > M_PI)
+    {
+      x_diff(3) -= 2.* M_PI;
+    }
+    else if (x_diff(3) < -M_PI)
+    {
+      x_diff(3) += 2.* M_PI;
+    }
 
     P_ = P_ + weights_(i) * x_diff * x_diff.transpose() ;
   }
@@ -382,8 +397,15 @@ void UKF::UpdateLidar(MeasurementPackage meas_package)
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
-    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
-    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+    x_diff(3) = fmod(x_diff(3), (2.* M_PI));
+    if (x_diff(3) > M_PI)
+    {
+      x_diff(3) -= 2.* M_PI;
+    }
+    else if (x_diff(3) < -M_PI)
+    {
+      x_diff(3) += 2.* M_PI;
+    }
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
@@ -475,8 +497,15 @@ void UKF::UpdateRadar(MeasurementPackage meas_package)
     VectorXd z_diff = Zsig.col(i) - z_pred;
 
     //angle normalization
-    while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
-    while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+    z_diff(1) = fmod(z_diff(1), (2.* M_PI));
+    if (z_diff(1) > M_PI)
+    {
+      z_diff(1) -= 2.* M_PI;
+    }
+    else if (z_diff(1) < -M_PI)
+    {
+      z_diff(1) += 2.* M_PI;
+    }
 
     S = S + weights_(i) * z_diff * z_diff.transpose();
   }
@@ -508,14 +537,28 @@ void UKF::UpdateRadar(MeasurementPackage meas_package)
     //residual
     VectorXd z_diff = Zsig.col(i) - z_pred;
     //angle normalization
-    while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
-    while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+    z_diff(1) = fmod(z_diff(1), (2.* M_PI));
+    if (z_diff(1) > M_PI)
+    {
+      z_diff(1) -= 2.* M_PI;
+    }
+    else if (z_diff(1) < -M_PI)
+    {
+      z_diff(1) += 2.* M_PI;
+    }
 
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
-    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
-    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+    x_diff(3) = fmod(x_diff(3), (2.* M_PI));
+    if (x_diff(3) > M_PI)
+    {
+      x_diff(3) -= 2.* M_PI;
+    }
+    else if (x_diff(3) < -M_PI)
+    {
+      x_diff(3) += 2.* M_PI;
+    }
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
@@ -527,8 +570,15 @@ void UKF::UpdateRadar(MeasurementPackage meas_package)
   VectorXd z_diff = z - z_pred;
 
   //angle normalization
-  while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
-  while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+  z_diff(1) = fmod(z_diff(1), (2.* M_PI));
+  if (z_diff(1) > M_PI)
+  {
+    z_diff(1) -= 2.* M_PI;
+  }
+  else if (z_diff(1) < -M_PI)
+  {
+    z_diff(1) += 2.* M_PI;
+  }
 
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
