@@ -66,26 +66,6 @@ int main(int argc, char* argv[])
 
   check_files(in_file_, in_file_name_, out_file_, out_file_name_);
 
-  // Create a UKF instance
-  UKF ukf;
-  ukf.std_a_ = atof(argv[1]);
-  ukf.std_yawdd_ = atof(argv[2]);
-  /*
-  ukf.P_(1,1) = 1;
-  ukf.P_(2,2) = 1;
-  ukf.P_(2,2) = 1;
-  ukf.P_(3,3) = 1;
-  ukf.P_(4,4) = 1;
-  
-  ukf.std_a_ = 0.292;
-  ukf.std_yawdd_ = M_PI/12;
-  ukf.P_(0,0) = 0.14;
-  ukf.P_(1,1) = 0.35;
-  ukf.P_(2,2) = 1;
-  ukf.P_(3,3) = 0.022;
-  ukf.P_(4,4) = 3;
-  */
-
   /**********************************************
    *  Set Measurements                          *
    **********************************************/
@@ -154,7 +134,6 @@ int main(int argc, char* argv[])
       gt_pack_list.push_back(gt_values);
   }
 
-
   /**********************************************
    *  Measurements                              *
    **********************************************/
@@ -162,11 +141,30 @@ int main(int argc, char* argv[])
   // compute the accuracy (RMSE)
   Tools tools;
 
+  // Create a UKF instance
+  UKF ukf;
+  float start_point = atof(argv[1]);
+  float step = atof(argv[2]);
   vector<float> rmse_list;
 
-  for (int test_id = 0; test_id < 100; test_id++)
+  for (int test_id = 0; test_id < 1; test_id++)
   {
-    ukf.std_yawdd_ += 0.01;
+    ukf.x_ = VectorXd::Zero(5);
+    ukf.P_ = MatrixXd::Zero(5, 5);
+    ukf.std_a_ = 0.292;
+    ukf.std_yawdd_ = 0.261;
+    ukf.is_initialized_ = false;
+    ukf.n_x_ = 5;
+    ukf.n_aug_ = 7;
+    ukf.Xsig_pred_ = MatrixXd::Zero(ukf.n_x_, 2 * ukf.n_aug_ + 1);
+    ukf.weights_ = VectorXd::Zero(2 * ukf.n_aug_ + 1);
+    ukf.P_ << 0.422, 0,    0,     0,     0,
+              0,     0.48, 0,     0,     0,
+              0,     0,    3.159, 0,     0,
+              0,     0,    0,     0.033, 0,
+              0,     0,    0,     0,     4.3;
+
+    //ukf.P_(2,2) = start_point;
 
     // used to compute the RMSE later
     vector<VectorXd> estimations;
@@ -177,75 +175,10 @@ int main(int argc, char* argv[])
 
     size_t number_of_measurements = measurement_pack_list.size();
 
-    /*
-    // column names for output file
-    out_file_ << "time_stamp" << "\t";  
-    out_file_ << "px_state" << "\t";
-    out_file_ << "py_state" << "\t";
-    out_file_ << "v_state" << "\t";
-    out_file_ << "yaw_angle_state" << "\t";
-    out_file_ << "yaw_rate_state" << "\t";
-    out_file_ << "sensor_type" << "\t";
-    //out_file_ << "NIS" << "\t";  
-    out_file_ << "px_measured" << "\t";
-    out_file_ << "py_measured" << "\t";
-    out_file_ << "px_ground_truth" << "\t";
-    out_file_ << "py_ground_truth" << "\t";
-    out_file_ << "vx_ground_truth" << "\t";
-    out_file_ << "vy_ground_truth" << "\n";
-    */
-
     for (size_t k = 0; k < number_of_measurements; ++k)
     {
       // Call the UKF-based fusion
       ukf.ProcessMeasurement(measurement_pack_list[k]);
-
-      /*
-      // timestamp
-      out_file_ << measurement_pack_list[k].timestamp_ << "\t"; // pos1 - est
-
-      // output the state vector
-      out_file_ << ukf.x_(0) << "\t"; // pos1 - est
-      out_file_ << ukf.x_(1) << "\t"; // pos2 - est
-      out_file_ << ukf.x_(2) << "\t"; // vel_abs -est
-      out_file_ << ukf.x_(3) << "\t"; // yaw_angle -est
-      out_file_ << ukf.x_(4) << "\t"; // yaw_rate -est
-
-      // output lidar and radar specific data
-      if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::LASER)
-      {
-        // sensor type
-        out_file_ << "lidar" << "\t";
-
-        // NIS value
-        //out_file_ << ukf.NIS_laser_ << "\t";
-
-        // output the lidar sensor measurement px and py
-        out_file_ << measurement_pack_list[k].raw_measurements_(0) << "\t";
-        out_file_ << measurement_pack_list[k].raw_measurements_(1) << "\t";
-
-      }
-      else if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::RADAR)
-      {
-        // sensor type
-        out_file_ << "radar" << "\t";
-
-        // NIS value
-        //out_file_ << ukf.NIS_radar_ << "\t";
-
-        // output radar measurement in cartesian coordinates
-        float ro = measurement_pack_list[k].raw_measurements_(0);
-        float phi = measurement_pack_list[k].raw_measurements_(1);
-        out_file_ << ro * cos(phi) << "\t"; // px measurement
-        out_file_ << ro * sin(phi) << "\t"; // py measurement
-      }
-
-      // output the ground truth
-      out_file_ << gt_pack_list[k](0) << "\t";
-      out_file_ << gt_pack_list[k](1) << "\t";
-      out_file_ << gt_pack_list[k](2) << "\t";
-      out_file_ << gt_pack_list[k](3) << "\n";
-      */
 
       // convert ukf x vector to cartesian to compare to ground truth
       VectorXd ukf_x_cartesian_ = VectorXd(4);
@@ -254,23 +187,25 @@ int main(int argc, char* argv[])
       float y_estimate_ = ukf.x_(1);
       float vx_estimate_ = ukf.x_(2) * cos(ukf.x_(3));
       float vy_estimate_ = ukf.x_(2) * sin(ukf.x_(3));
-      
+
       ukf_x_cartesian_ << x_estimate_, y_estimate_, vx_estimate_, vy_estimate_;
-      
+
       estimations.push_back(ukf_x_cartesian_);
       ground_truth.push_back(gt_pack_list[k]);
     }
     VectorXd rmse = tools.CalculateRMSE(estimations, ground_truth);
     rmse_list.push_back(rmse[1]);
-    //cout << "RMSE: " << rmse[0] << " " << rmse[1] << " " << rmse[2] << " " << rmse[3] << endl;
-
+    cout << "RMSE: " << rmse[0] << " " << rmse[1] << " " << rmse[2] << " " << rmse[3] << endl;
     cout << " " << test_id << std::flush;
-  }
 
+    start_point += step;
+  }
   cout << endl;
-  int min_index = min_element(rmse_list.begin(), rmse_list.end()) - rmse_list.begin();
-  cout << "min value at " << min_index << endl;
-  cout << "min value " << rmse_list[min_index] << endl;
+
+  vector<float>::iterator min_index = min_element(rmse_list.begin(), rmse_list.end());
+  cout << "min value at " << distance(rmse_list.begin(), min_index) << endl;
+  cout << "min value " << *min_index << endl;
+  cout << "set value " << atof(argv[1]) + step*distance(rmse_list.begin(), min_index) << endl;
 
   // close files
   if (out_file_.is_open())

@@ -28,7 +28,7 @@ UKF::UKF()
   std_a_ = 0.292;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = M_PI/12;
+  std_yawdd_ = 0.261;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -72,11 +72,11 @@ UKF::UKF()
   weights_ = VectorXd::Zero(2 * n_aug_ + 1);
 
   // Update covariance matrix
-  P_ << 0.14, 0,    0, 0,     0,
-        0,    0.35, 0, 0,     0,
-        0,    0,    1, 0,     0,
-        0,    0,    0, 0.022, 0,
-        0,    0,    0, 0,     3;
+  P_ << 0.422, 0,    0,     0,     0,
+        0,     0.48, 0,     0,     0,
+        0,     0,    3.159, 0,     0,
+        0,     0,    0,     0.033, 0,
+        0,     0,    0,     0,     4.3;
 }
 
 UKF::~UKF()
@@ -124,7 +124,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
       float px = ro * cos(theta);
       float py = ro * sin(theta);
       x_ << px, py, 0, 0, 0;
-      cout << "RADAR x: " << x_[0] << " " << x_[1] << endl;
+      //cout << "RADAR x: " << x_[0] << " " << x_[1] << endl;
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::LASER)
     {
@@ -134,7 +134,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
       float px = meas_package.raw_measurements_[0];
       float py = meas_package.raw_measurements_[1];
       x_ << px, py, 0, 0, 0;
-      cout << "LASER x: " << x_[0] << " " << x_[1] << endl;
+      //cout << "LASER x: " << x_[0] << " " << x_[1] << endl;
     }
 
     time_us_ = meas_package.timestamp_;
