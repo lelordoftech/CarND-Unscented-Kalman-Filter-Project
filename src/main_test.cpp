@@ -7,6 +7,7 @@
 #include "ukf.h"
 #include "measurement_package.h"
 #include "tools.h"
+#include <iomanip>
 
 using namespace std;
 using Eigen::MatrixXd;
@@ -61,7 +62,7 @@ int main(int argc, char* argv[])
   string in_file_name_ = "../data/obj_pose-laser-radar-synthetic-input.txt"; //argv[1];
   ifstream in_file_(in_file_name_.c_str(), ifstream::in);
 
-  string out_file_name_ = "output.txt"; //argv[2];
+  string out_file_name_ = "NIS.txt"; //argv[2];
   ofstream out_file_(out_file_name_.c_str(), ofstream::out);
 
   check_files(in_file_, in_file_name_, out_file_, out_file_name_);
@@ -151,20 +152,22 @@ int main(int argc, char* argv[])
   {
     ukf.x_ = VectorXd::Zero(5);
     ukf.P_ = MatrixXd::Zero(5, 5);
-    ukf.std_a_ = 0.292;
-    ukf.std_yawdd_ = 0.261;
+    ukf.std_a_ = 0.281;
+    ukf.std_yawdd_ = 0.265;
     ukf.is_initialized_ = false;
     ukf.n_x_ = 5;
     ukf.n_aug_ = 7;
     ukf.Xsig_pred_ = MatrixXd::Zero(ukf.n_x_, 2 * ukf.n_aug_ + 1);
     ukf.weights_ = VectorXd::Zero(2 * ukf.n_aug_ + 1);
-    ukf.P_ << 0.422, 0,    0,     0,     0,
-              0,     0.48, 0,     0,     0,
-              0,     0,    3.159, 0,     0,
-              0,     0,    0,     0.033, 0,
-              0,     0,    0,     0,     4.3;
+    ukf.P_ << 0.504, 0,    0,     0,     0,
+              0,     0.45, 0,     0,     0,
+              0,     0,    3.145, 0,     0,
+              0,     0,    0,     0.034, 0,
+              0,     0,    0,     0,     4.208;
 
-    //ukf.P_(2,2) = start_point;
+    ukf.x_(2) = 5.200004206;
+    ukf.x_(3) = 0.103512611;
+    ukf.x_(4) = 2.051;
 
     // used to compute the RMSE later
     vector<VectorXd> estimations;
@@ -176,9 +179,27 @@ int main(int argc, char* argv[])
     size_t number_of_measurements = measurement_pack_list.size();
 
     for (size_t k = 0; k < number_of_measurements; ++k)
+    //for (size_t k = 0; k < 6; ++k)
     {
       // Call the UKF-based fusion
       ukf.ProcessMeasurement(measurement_pack_list[k]);
+
+      if (measurement_pack_list[k].sensor_type_ == 1)
+      {
+        out_file_ << "R" << "\t" << ukf.NIS_radar_ << endl;
+        if (ukf.NIS_radar_ >= 7.815)
+        {
+          cout << "Radar - NIS: " << ukf.NIS_radar_ << endl;
+        }
+      }
+      else
+      {
+        out_file_ << "L" << "\t" << ukf.NIS_laser_ << endl;
+        if (ukf.NIS_laser_ >= 5.991)
+        {
+          cout << "Lidar - NIS: " << ukf.NIS_laser_ << endl;
+        }
+      }
 
       // convert ukf x vector to cartesian to compare to ground truth
       VectorXd ukf_x_cartesian_ = VectorXd(4);
@@ -193,12 +214,18 @@ int main(int argc, char* argv[])
       estimations.push_back(ukf_x_cartesian_);
       ground_truth.push_back(gt_pack_list[k]);
     }
+    start_point += step;
+
     VectorXd rmse = tools.CalculateRMSE(estimations, ground_truth);
     rmse_list.push_back(rmse[1]);
-    cout << "RMSE: " << rmse[0] << " " << rmse[1] << " " << rmse[2] << " " << rmse[3] << endl;
-    cout << " " << test_id << std::flush;
 
-    start_point += step;
+    cout << "RMSE: "
+        << std::fixed << std::setprecision(6) << rmse[0] << " "
+        << std::fixed << std::setprecision(6) << rmse[1] << " "
+        << std::fixed << std::setprecision(6) << rmse[2] << " "
+        << std::fixed << std::setprecision(6) << rmse[3] << endl;
+
+    cout << " " << test_id << std::flush;
   }
   cout << endl;
 
