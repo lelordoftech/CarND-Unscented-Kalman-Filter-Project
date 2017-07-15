@@ -42,13 +42,15 @@ int main()
   vector<VectorXd> estimations;
   vector<VectorXd> ground_truth;
 
-  string out_file_name_ = "RMSE.txt";
+  string out_file_name_ = "../output/RMSE_NIS.txt";
   ofstream out_file_(out_file_name_.c_str(), ofstream::out);
 
   out_file_ << "x" << "\t";
   out_file_ << "y" << "\t";
   out_file_ << "vx" << "\t";
-  out_file_ << "vy" << "\n";
+  out_file_ << "vy" << "\t";
+  out_file_ << "sensor_type" << "\t";
+  out_file_ << "NIS" << "\n";
 
   h.onMessage([&ukf,&tools,&estimations,&ground_truth,&out_file_]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode)
@@ -93,7 +95,6 @@ int main()
           }
           else if (sensor_type.compare("R") == 0)
           {
-
             meas_package.sensor_type_ = MeasurementPackage::RADAR;
             meas_package.raw_measurements_ = VectorXd(3);
             float ro;
@@ -126,7 +127,6 @@ int main()
           ukf.ProcessMeasurement(meas_package);
 
           //Push the current estimated x,y positon from the Kalman filter's state vector
-
           VectorXd estimate(4);
 
           double p_x = ukf.x_(0);
@@ -154,16 +154,30 @@ int main()
           msgJson["rmse_vx"] = RMSE(2);
           msgJson["rmse_vy"] = RMSE(3);
           auto msg = "42[\"estimate_marker\"," + msgJson.dump() + "]";
-          std::cout << "RMSE: " 
-                    << std::fixed << std::setprecision(4) << RMSE(0) << " "
-                    << std::fixed << std::setprecision(4) << RMSE(1) << " "
-                    << std::fixed << std::setprecision(4) << RMSE(2) << " "
-                    << std::fixed << std::setprecision(4) << RMSE(3) << std::endl;
+          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+
+          double NIS_value = 0;
+          if (sensor_type.compare("L") == 0)
+          {
+            NIS_value = ukf.NIS_laser_;
+          }
+          else
+          {
+            NIS_value = ukf.NIS_radar_;
+          }
+
+          std::cout << "RMSE: "
+                    << std::fixed << std::setprecision(4) << RMSE(0) << "\t"
+                    << std::fixed << std::setprecision(4) << RMSE(1) << "\t"
+                    << std::fixed << std::setprecision(4) << RMSE(2) << "\t"
+                    << std::fixed << std::setprecision(4) << RMSE(3) << "\t"
+                    << sensor_type << "\tNIS: " << NIS_value << std::endl;
+
           out_file_ << std::fixed << std::setprecision(4) << RMSE(0) << "\t"
                     << std::fixed << std::setprecision(4) << RMSE(1) << "\t"
                     << std::fixed << std::setprecision(4) << RMSE(2) << "\t"
-                    << std::fixed << std::setprecision(4) << RMSE(3) << std::endl;
-          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                    << std::fixed << std::setprecision(4) << RMSE(3) << "\t"
+                    << sensor_type  << "\t" << NIS_value << std::endl;
         }
       }
       else

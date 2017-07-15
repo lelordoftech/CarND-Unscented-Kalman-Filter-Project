@@ -25,10 +25,10 @@ UKF::UKF()
   P_ = MatrixXd::Zero(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.281;
+  std_a_ = 0.557;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.265;
+  std_yawdd_ = 0.575;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -47,9 +47,7 @@ UKF::UKF()
 
   /**
   TODO:
-
   Complete the initialization. See ukf.h for other member properties.
-
   Hint: one or more values initialized above might be wildly off...
   */
 
@@ -76,13 +74,6 @@ UKF::UKF()
 
   // initial vector for weights_
   weights_ = VectorXd::Zero(2 * n_aug_ + 1);
-
-  // Update covariance matrix
-  P_ << 0.504, 0,    0,     0,     0,
-        0,     0.45, 0,     0,     0,
-        0,     0,    3.145, 0,     0,
-        0,     0,    0,     0.034, 0,
-        0,     0,    0,     0,     4.208;
 }
 
 UKF::~UKF()
@@ -98,7 +89,6 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
 {
   /**
   TODO:
-
   Complete this function! Make sure you switch between lidar and radar
   measurements.
   */
@@ -119,6 +109,13 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
       double weight = 0.5/(n_aug_+lambda_);
       weights_(i) = weight;
     }
+
+    // Update covariance matrix
+    P_ << 0.555, 0, 0, 0, 0,
+          0, 0.001, 0, 0, 0,
+          0, 0, 0.434, 0, 0,
+          0, 0, 0, 0.001, 0,
+          0, 0, 0, 0, 0.001;
 
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
     {
@@ -169,6 +166,9 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
   }
   Prediction(delta_t);
 
+  if (is_initialized_ == false) //in case throw range_error("LLT failed");
+    return;
+
   /*****************************************************************************
    *  Update
    ****************************************************************************/
@@ -200,7 +200,6 @@ void UKF::Prediction(double delta_t)
 {
   /**
   TODO:
-
   Complete this function! Estimate the object's location. Modify the state
   vector, x_. Predict sigma points, the state, and the state covariance matrix.
   */
@@ -229,7 +228,20 @@ void UKF::Prediction(double delta_t)
   P_aug(6,6) = std_yawdd_*std_yawdd_;
 
   //create square root matrix
-  MatrixXd L = P_aug.llt().matrixL();
+  //MatrixXd L = P_aug.llt().matrixL();
+  Eigen::LLT<MatrixXd> lltOfPaug(P_aug);
+
+  if (lltOfPaug.info() == Eigen::NumericalIssue)
+  {
+    cout << "LLT failed!" << endl;
+    //throw range_error("LLT failed");
+    // If convariance matrix is non positive definite (because of numerical instability),
+    // restart the filter using previous measurement as initialiser.
+    is_initialized_ = false;
+    return;
+  }
+
+  MatrixXd L = lltOfPaug.matrixL();
 
   //create augmented sigma points
   Xsig_aug.col(0)  = x_aug;
@@ -322,10 +334,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package)
 {
   /**
   TODO:
-
   Complete this function! Use lidar data to update the belief about the object's
   position. Modify the state vector, x_, and covariance, P_.
-
   You'll also need to calculate the lidar NIS.
   */
 
@@ -379,8 +389,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd::Zero(n_z,n_z);
-  R << std_a_*std_a_, 0,
-       0, std_a_*std_a_;
+  R << std_laspx_*std_laspx_, 0,
+       0, std_laspy_*std_laspy_;
   S = S + R;
 
   /*****************************************************************************
@@ -413,10 +423,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package)
 {
   /**
   TODO:
-
   Complete this function! Use radar data to update the belief about the object's
   position. Modify the state vector, x_, and covariance, P_.
-
   You'll also need to calculate the radar NIS.
   */
 
@@ -487,7 +495,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd::Zero(n_z,n_z);
-  R << std_radr_*std_radr_,     0, 0,
+  R << std_radr_*std_radr_, 0, 0,
        0, std_radphi_*std_radphi_, 0,
        0, 0, std_radrd_*std_radrd_;
   S = S + R;

@@ -109,6 +109,10 @@ public:
   void UpdateRadar(MeasurementPackage meas_package);
 
 private:
+  /**
+   * Normalize angle: -PI to +PI
+   * @param angle The angle need to be normalized
+   */
   double angle_normalize(double angle);
 };
 

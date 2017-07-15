@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
   string in_file_name_ = "../data/obj_pose-laser-radar-synthetic-input.txt"; //argv[1];
   ifstream in_file_(in_file_name_.c_str(), ifstream::in);
 
-  string out_file_name_ = "NIS.txt"; //argv[2];
+  string out_file_name_ = "../output/NIS.txt"; //argv[2];
   ofstream out_file_(out_file_name_.c_str(), ofstream::out);
 
   check_files(in_file_, in_file_name_, out_file_, out_file_name_);
@@ -152,22 +152,20 @@ int main(int argc, char* argv[])
   {
     ukf.x_ = VectorXd::Zero(5);
     ukf.P_ = MatrixXd::Zero(5, 5);
-    ukf.std_a_ = 0.281;
-    ukf.std_yawdd_ = 0.265;
+    ukf.std_a_ = 0.557;
+    ukf.std_yawdd_ = 0.575;
     ukf.is_initialized_ = false;
     ukf.n_x_ = 5;
     ukf.n_aug_ = 7;
     ukf.Xsig_pred_ = MatrixXd::Zero(ukf.n_x_, 2 * ukf.n_aug_ + 1);
     ukf.weights_ = VectorXd::Zero(2 * ukf.n_aug_ + 1);
-    ukf.P_ << 0.504, 0,    0,     0,     0,
-              0,     0.45, 0,     0,     0,
-              0,     0,    3.145, 0,     0,
-              0,     0,    0,     0.034, 0,
-              0,     0,    0,     0,     4.208;
+    ukf.P_ << 0.555, 0, 0, 0, 0,
+              0, 0.001, 0, 0, 0,
+              0, 0, 0.434, 0, 0,
+              0, 0, 0, 0.001, 0,
+              0, 0, 0, 0, 0.001;
 
-    ukf.x_(2) = 5.200004206;
-    ukf.x_(3) = 0.103512611;
-    ukf.x_(4) = 2.051;
+    //ukf.std_yawdd_ = start_point;
 
     // used to compute the RMSE later
     vector<VectorXd> estimations;
@@ -177,15 +175,20 @@ int main(int argc, char* argv[])
     // frame)
 
     size_t number_of_measurements = measurement_pack_list.size();
+    double first_NIS_radar = 0;
 
     for (size_t k = 0; k < number_of_measurements; ++k)
-    //for (size_t k = 0; k < 6; ++k)
     {
       // Call the UKF-based fusion
       ukf.ProcessMeasurement(measurement_pack_list[k]);
 
       if (measurement_pack_list[k].sensor_type_ == 1)
       {
+        if (first_NIS_radar == 0)
+        {
+          first_NIS_radar = ukf.NIS_radar_;
+        }
+
         out_file_ << "R" << "\t" << ukf.NIS_radar_ << endl;
         if (ukf.NIS_radar_ >= 7.815)
         {
@@ -217,17 +220,16 @@ int main(int argc, char* argv[])
     start_point += step;
 
     VectorXd rmse = tools.CalculateRMSE(estimations, ground_truth);
-    rmse_list.push_back(rmse[1]);
+    rmse_list.push_back(rmse[0]+rmse[1]+rmse[2]+rmse[3]);
 
+    cout << " " << test_id << endl;
+    cout << "First NIS radar: " << first_NIS_radar << endl;
     cout << "RMSE: "
         << std::fixed << std::setprecision(6) << rmse[0] << " "
         << std::fixed << std::setprecision(6) << rmse[1] << " "
         << std::fixed << std::setprecision(6) << rmse[2] << " "
         << std::fixed << std::setprecision(6) << rmse[3] << endl;
-
-    cout << " " << test_id << std::flush;
   }
-  cout << endl;
 
   vector<float>::iterator min_index = min_element(rmse_list.begin(), rmse_list.end());
   cout << "min value at " << distance(rmse_list.begin(), min_index) << endl;
